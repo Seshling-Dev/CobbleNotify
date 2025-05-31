@@ -255,9 +255,6 @@ public class Notification {
   private static String replacePlayers(List<ServerPlayerEntity> players, String message, int maxDisplayedPlayers) {
     if (players == null || players.isEmpty()) {
       message = message.replace("%player%", "");
-      for (int i = 0; i < 3; i++) {
-        message = message.replace("%player" + (i + 1) + "%", "");
-      }
       return message;
     }
     int size = Math.min(players.size(), maxDisplayedPlayers);
