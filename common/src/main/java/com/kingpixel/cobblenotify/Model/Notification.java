@@ -12,6 +12,7 @@ import com.kingpixel.cobbleutils.Model.Sound;
 import com.kingpixel.cobbleutils.Model.discord.WebHookStruct;
 import com.kingpixel.cobbleutils.util.PlayerUtils;
 import com.kingpixel.cobbleutils.util.PokemonUtils;
+import com.kingpixel.cobbleutils.util.TypeMessage;
 import lombok.Getter;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -29,7 +30,6 @@ public class Notification {
   private boolean WebHookTrade;
   private boolean WebHookDefeat;
   private boolean notifyNearby;
-  private int maxDisplayedPlayers;
   private boolean traded;
   private String messageTrade;
   private boolean defeated;
@@ -52,18 +52,17 @@ public class Notification {
     this.WebHookTrade = true;
     this.WebHookDefeat = true;
     this.notifyNearby = true;
-    this.maxDisplayedPlayers = 3;
     this.traded = true;
     this.messageTrade = "%prefix% <#d88939>%player1%  <#80cd40>and <#d88939>%player2% <#80cd40>have traded " +
-            "<#d88939>%pokemon1% %shiny1% <#80cd40>and " +
-            "<#d88939>%pokemon2% %shiny2%!";
+      "<#d88939>%pokemon1% %shiny1% <#80cd40>and " +
+      "<#d88939>%pokemon2% %shiny2%!";
     this.defeated = true;
     this.messageDefeat = "%prefix% <#d88939>%player% <#80cd40>has defeated <#e77972>%pokemon% %shiny%!";
     this.catched = true;
     this.messageCatch = "%prefix% <#d88939>%player% <#80cd40>has caught <#e77972>%pokemon% %shiny%!";
     this.spawned = true;
     this.messageSpawn = "%prefix% <#e77972>%pokemon% %shiny% <#80cd40>has spawned in <#e77161>%x% %y% %z% " +
-            "<#72e792>%biome%!";
+      "<#72e792>%biome%!\n Nearest players: %nearest%";
     this.labels = labels;
     this.persistentData = persistentData;
     this.pokemons = List.of("");
@@ -74,21 +73,21 @@ public class Notification {
 
   public static List<Notification> getNotifications() {
     return List.of(
-            new Notification(
-                    List.of(),
-                    List.of("shiny")
-            ),
-            new Notification(
-                    List.of(CobblemonPokemonLabels.LEGENDARY,
-                            CobblemonPokemonLabels.MYTHICAL,
-                            CobblemonPokemonLabels.ULTRA_BEAST
-                    ),
-                    null
-            ),
-            new Notification(
-                    List.of(),
-                    List.of(CobbleUtilsTags.BOSS_TAG)
-            )
+      new Notification(
+        List.of(),
+        List.of("shiny")
+      ),
+      new Notification(
+        List.of(CobblemonPokemonLabels.LEGENDARY,
+          CobblemonPokemonLabels.MYTHICAL,
+          CobblemonPokemonLabels.ULTRA_BEAST
+        ),
+        null
+      ),
+      new Notification(
+        List.of(),
+        List.of(CobbleUtilsTags.BOSS_TAG)
+      )
     );
   }
 
@@ -109,7 +108,7 @@ public class Notification {
       }
       if (notification.getForms() != null) {
         if (notification.getForms().contains(pokemon.getForm().formOnlyShowdownId()) || notification.getForms().contains("*")
-                || pokemon.getAspects().stream().anyMatch(aspect -> notification.getForms().contains(aspect)))
+          || pokemon.getAspects().stream().anyMatch(aspect -> notification.getForms().contains(aspect)))
           return true;
       }
       if (notification.getPersistentData() != null) {
@@ -127,10 +126,13 @@ public class Notification {
   private static Notification searchNotification(List<Notification> notifications, List<Pokemon> pokemons,
                                                  EventType eventType) {
     for (Pokemon pokemon : pokemons) {
-      if (eventType != EventType.CATCH) {
+      if (eventType == EventType.SPAWN || eventType == EventType.DEFEAT) {
         if (pokemon.isPlayerOwned()) return null;
+        if (pokemon.isNPCOwned()) return null;
+        if (pokemon.getOwnerUUID() != null) return null;
+        if (pokemon.getOwnerEntity() != null) return null;
+        if (!pokemon.isWild()) return null;
       }
-      if (pokemon.isNPCOwned()) return null;
 
       if (eventType != EventType.CATCH) {
         if (!pokemon.isWild()) return null;
@@ -152,7 +154,7 @@ public class Notification {
   }
 
   public static Notification handleEvent(List<Pokemon> pokemons, List<ServerPlayerEntity> players, EventType eventType,
-                                         InfoSpawn info) {
+                                         InfoSpawn info, List<PokemonEntity> pokemonEntitys) {
     try {
       if (pokemons == null || pokemons.isEmpty()) return null;
       for (Pokemon pokemon : pokemons)
@@ -165,11 +167,10 @@ public class Notification {
         switch (eventType) {
           case TRADE:
             if (!notification.isTraded()) return null;
-            message = message = replacePlayers(players, PokemonUtils.replace(notification.getMessageTrade(), pokemons), notification.getMaxDisplayedPlayers());
-            ;
+            message = replacePlayers(players, PokemonUtils.replace(notification.getMessageTrade(), pokemons));
             PlayerUtils.broadcast(
-                    message,
-                    CobbleNotify.language.getPrefix()
+              message,
+              CobbleNotify.language.getPrefix()
             );
             if (notification.WebHookTrade) {
               webHookStruct = CobbleNotify.language.getMessageWebHookTrade();
@@ -181,10 +182,9 @@ public class Notification {
             int size = players.size();
             if (size == 1) {
               PlayerUtils.sendMessage(
-                      players.getFirst(),
-                      replacePlayers(players, PokemonUtils.replace(notification.getMessageDefeat(), pokemons), notification.getMaxDisplayedPlayers()),
-
-                      CobbleNotify.language.getPrefix()
+                players.getFirst(),
+                replacePlayers(players, PokemonUtils.replace(notification.getMessageDefeat(), pokemons)),
+                CobbleNotify.language.getPrefix()
               );
             }
             if (notification.WebHookDefeat) {
@@ -195,9 +195,9 @@ public class Notification {
             if (!notification.isCatched()) return null;
             CobbleUtils.server.getPlayerManager().getPlayerList().forEach(player -> {
               PlayerUtils.sendMessage(
-                      player,
-                      replacePlayers(players, PokemonUtils.replace(notification.getMessageCatch(), pokemons), notification.getMaxDisplayedPlayers()),
-                      CobbleNotify.language.getPrefix()
+                player,
+                replacePlayers(players, PokemonUtils.replace(notification.getMessageCatch(), pokemons)),
+                CobbleNotify.language.getPrefix()
               );
             });
             if (notification.WebHookCatch) {
@@ -206,22 +206,23 @@ public class Notification {
             break;
           case SPAWN:
             if (!notification.isSpawned()) return null;
-            message = PokemonUtils.replace(replacePlayers(players, replaceInfo(info, notification.getMessageSpawn()), notification.getMaxDisplayedPlayers()), pokemons);
+            message = PokemonUtils.replace(replacePlayers(players, replaceInfo(info, notification.getMessageSpawn())), pokemons);
             if (notification.isNotifyNearby()) {
               for (ServerPlayerEntity player : players) {
                 PlayerUtils.sendMessage(
-                        player,
-                        message,
-                        CobbleNotify.language.getPrefix()
+                  player,
+                  message,
+                  CobbleNotify.language.getPrefix(),
+                  TypeMessage.CHAT
                 );
               }
             } else {
               PlayerUtils.broadcast(
-                      message,
-                      CobbleNotify.language.getPrefix()
+                message,
+                CobbleNotify.language.getPrefix()
               );
             }
-            if (notification.WebHookSpawn) {
+            if (notification.isWebHookSpawn()) {
               webHookStruct = CobbleNotify.language.getMessageWebHookSpawn();
             }
             break;
@@ -231,15 +232,15 @@ public class Notification {
           if (players.isEmpty()) return notification;
           if (pokemons == null) return notification;
           if (pokemons.isEmpty()) return notification;
-          for (Pokemon pokemon : pokemons) {
+          for (PokemonEntity pokemon : pokemonEntitys) {
             if (pokemon == null) return notification;
           }
-          ServerPlayerEntity player = players.getFirst();
+          //ServerPlayerEntity player = players.getFirst();
           if (webHookStruct != null) {
-            WebhookMessage webhookMessage = webHookStruct.getMessage(
-                    CobbleNotify.config.getWebHookData(),
-                    player,
-                    pokemons
+            WebhookMessage webhookMessage = webHookStruct.getMessageEntity(
+              CobbleNotify.config.getWebHookData(),
+              players,
+              pokemonEntitys
             );
             CobbleNotify.webhookClient.send(webhookMessage);
           }
@@ -252,31 +253,43 @@ public class Notification {
     return null;
   }
 
-  private static String replacePlayers(List<ServerPlayerEntity> players, String message, int maxDisplayedPlayers) {
+  private static String replacePlayers(List<ServerPlayerEntity> players, String message) {
     if (players == null || players.isEmpty()) {
       message = message.replace("%player%", "");
+      for (int i = 0; i < 3; i++) {
+        message = message.replace("%player" + i + "%", "");
+      }
       return message;
     }
-    int size = Math.min(players.size(), maxDisplayedPlayers);
+    int size = players.size();
     if (size == 1) {
-      message = message.replace("%player%", players.getFirst().getGameProfile().getName());
+      message = message
+        .replace("%player%", players.getFirst().getGameProfile().getName());
     } else {
-      String joinedNames = players.stream()
-              .limit(maxDisplayedPlayers)
-              .map(p -> p.getGameProfile().getName())
-              .collect(java.util.stream.Collectors.joining(", "));
-      message = message.replace("%player%", joinedNames);
+      for (int i = 0; i < size; i++) {
+        message = message
+          .replace("%player" + (i + 1) + "%", players.get(i).getGameProfile().getName());
+      }
     }
+    if (!players.isEmpty()) {
+      String[] nearest = new String[players.size()];
+      int s = players.size();
+      for (int i = 0; i < s; i++) {
+        nearest[i] = players.get(i).getGameProfile().getName();
+      }
+      message = message.replace("%nearest%", String.join(", ", nearest));
+    }
+
     return message;
   }
 
   private static String replaceInfo(InfoSpawn infoSpawn, String message) {
     if (infoSpawn == null) return message;
     return message
-            .replace("%biome%", infoSpawn.getBiome())
-            .replace("%world%", infoSpawn.getWorld())
-            .replace("%x%", String.valueOf(infoSpawn.getX()))
-            .replace("%y%", String.valueOf(infoSpawn.getY()))
-            .replace("%z%", String.valueOf(infoSpawn.getZ()));
+      .replace("%biome%", infoSpawn.getBiome())
+      .replace("%world%", infoSpawn.getWorld())
+      .replace("%x%", String.valueOf(infoSpawn.getX()))
+      .replace("%y%", String.valueOf(infoSpawn.getY()))
+      .replace("%z%", String.valueOf(infoSpawn.getZ()));
   }
 }

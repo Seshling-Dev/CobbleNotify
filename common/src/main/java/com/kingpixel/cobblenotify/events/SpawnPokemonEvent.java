@@ -6,7 +6,6 @@ import com.cobblemon.mod.common.entity.pokemon.PokemonEntity;
 import com.kingpixel.cobblenotify.CobbleNotify;
 import com.kingpixel.cobblenotify.Model.InfoSpawn;
 import com.kingpixel.cobblenotify.Model.Notification;
-import com.kingpixel.cobblenotify.Model.VanishIntegration;
 import dev.architectury.event.EventResult;
 import dev.architectury.event.events.common.EntityEvent;
 import kotlin.Unit;
@@ -29,7 +28,7 @@ public class SpawnPokemonEvent {
       return EventResult.pass();
     });
 
-    CobblemonEvents.POKEMON_ENTITY_SPAWN.subscribe(Priority.LOWEST, evt -> {
+    CobblemonEvents.POKEMON_ENTITY_SPAWN.subscribe(Priority.LOW, evt -> {
       if (CobbleNotify.config.isAffectCommands()) return Unit.INSTANCE;
       handleNotification(evt.getEntity());
       return Unit.INSTANCE;
@@ -40,17 +39,14 @@ public class SpawnPokemonEvent {
     try {
       InfoSpawn info = createInfoSpawn(pokemonEntity);
       List<ServerPlayerEntity> players = pokemonEntity.getWorld().getEntitiesByClass(
-                      ServerPlayerEntity.class,
-                      Box.from(pokemonEntity.getPos()).expand(CobbleNotify.config.getDistance()),
-                      player -> !player.isSpectator()
-              ).stream()
-              .filter(player -> !VanishIntegration.isVanished(player))
-              .toList();
-
-      if (players.isEmpty()) return;
+        ServerPlayerEntity.class,
+        Box.from(pokemonEntity.getPos()).expand(CobbleNotify.config.getDistance()),
+        player -> true
+      );
+      var pokemonEntitys = List.of(pokemonEntity);
 
       Notification notification = Notification.handleEvent(List.of(pokemonEntity.getPokemon()), players,
-              Notification.EventType.SPAWN, info);
+        Notification.EventType.SPAWN, info, pokemonEntitys);
       if (notification != null) {
         notification.getSound().start(pokemonEntity);
         notification.getParticle().sendParticlesNearPlayers(pokemonEntity);
@@ -59,6 +55,7 @@ public class SpawnPokemonEvent {
       e.printStackTrace();
     }
   }
+
 
   private static InfoSpawn createInfoSpawn(PokemonEntity pokemonEntity) {
     InfoSpawn info = new InfoSpawn();
@@ -76,7 +73,7 @@ public class SpawnPokemonEvent {
     }
 
     try {
-      world = "<lang:world." + pokemonEntity.getWorld().getRegistryKey().getRegistry().toShortTranslationKey() + ">";
+      world = pokemonEntity.getEntityWorld().getRegistryKey().getValue() + "";
     } catch (Exception ignored) {
       world = "Unknown";
     }
