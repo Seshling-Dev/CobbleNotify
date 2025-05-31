@@ -30,6 +30,7 @@ public class Notification {
   private boolean WebHookTrade;
   private boolean WebHookDefeat;
   private boolean notifyNearby;
+  private int maxListedPlayers;
   private boolean traded;
   private String messageTrade;
   private boolean defeated;
@@ -52,6 +53,7 @@ public class Notification {
     this.WebHookTrade = true;
     this.WebHookDefeat = true;
     this.notifyNearby = true;
+    this.maxListedPlayers = 5;
     this.traded = true;
     this.messageTrade = "%prefix% <#d88939>%player1%  <#80cd40>and <#d88939>%player2% <#80cd40>have traded " +
       "<#d88939>%pokemon1% %shiny1% <#80cd40>and " +
@@ -255,27 +257,28 @@ public class Notification {
 
   private static String replacePlayers(List<ServerPlayerEntity> players, String message) {
     if (players == null || players.isEmpty()) {
-      message = message.replace("%player%", "");
-      for (int i = 0; i < 3; i++) {
-        message = message.replace("%player" + i + "%", "");
-      }
+
       return message;
     }
-    int size = players.size();
+    List<ServerPlayerEntity> visiblePlayers = players.stream()
+            .filter(player -> !VanishIntegration.isVanished(player))
+            .toList();
+
+    int size = visiblePlayers.size();
+
     if (size == 1) {
-      message = message
-        .replace("%player%", players.getFirst().getGameProfile().getName());
+      message = message.replace("%player%", visiblePlayers.getFirst().getGameProfile().getName());
     } else {
       for (int i = 0; i < size; i++) {
-        message = message
-          .replace("%player" + (i + 1) + "%", players.get(i).getGameProfile().getName());
+        message = message.replace("%player" + (i + 1) + "%", visiblePlayers.get(i).getGameProfile().getName());
       }
     }
-    if (!players.isEmpty()) {
-      String[] nearest = new String[players.size()];
-      int s = players.size();
+
+    if (!visiblePlayers.isEmpty()) {
+      String[] nearest = new String[visiblePlayers.size()];
+      int s = visiblePlayers.size();
       for (int i = 0; i < s; i++) {
-        nearest[i] = players.get(i).getGameProfile().getName();
+        nearest[i] = visiblePlayers.get(i).getGameProfile().getName();
       }
       message = message.replace("%nearest%", String.join(", ", nearest));
     }
