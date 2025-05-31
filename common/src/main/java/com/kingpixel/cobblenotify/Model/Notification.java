@@ -260,6 +260,7 @@ public class Notification {
     int size = Math.min(players.size(), maxDisplayedPlayers);
     if (size == 1) {
       message = message.replace("%player%", players.getFirst().getGameProfile().getName());
+    } else {
       String joinedNames = players.stream()
               .limit(maxDisplayedPlayers)
               .map(p -> p.getGameProfile().getName())
