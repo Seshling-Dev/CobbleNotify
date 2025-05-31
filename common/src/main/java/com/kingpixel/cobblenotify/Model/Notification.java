@@ -29,6 +29,7 @@ public class Notification {
   private boolean WebHookTrade;
   private boolean WebHookDefeat;
   private boolean notifyNearby;
+  private int maxDisplayedPlayers;
   private boolean traded;
   private String messageTrade;
   private boolean defeated;
@@ -51,6 +52,7 @@ public class Notification {
     this.WebHookTrade = true;
     this.WebHookDefeat = true;
     this.notifyNearby = true;
+    this.maxDisplayedPlayers = 3;
     this.traded = true;
     this.messageTrade = "%prefix% <#d88939>%player1%  <#80cd40>and <#d88939>%player2% <#80cd40>have traded " +
             "<#d88939>%pokemon1% %shiny1% <#80cd40>and " +
@@ -163,7 +165,8 @@ public class Notification {
         switch (eventType) {
           case TRADE:
             if (!notification.isTraded()) return null;
-            message = replacePlayers(players, PokemonUtils.replace(notification.getMessageTrade(), pokemons));
+            message = message = replacePlayers(players, PokemonUtils.replace(notification.getMessageTrade(), pokemons), notification.getMaxDisplayedPlayers());
+            ;
             PlayerUtils.broadcast(
                     message,
                     CobbleNotify.language.getPrefix()
@@ -179,7 +182,8 @@ public class Notification {
             if (size == 1) {
               PlayerUtils.sendMessage(
                       players.getFirst(),
-                      replacePlayers(players, PokemonUtils.replace(notification.getMessageDefeat(), pokemons)),
+                      replacePlayers(players, PokemonUtils.replace(notification.getMessageDefeat(), pokemons), notification.getMaxDisplayedPlayers()),
+
                       CobbleNotify.language.getPrefix()
               );
             }
@@ -192,7 +196,7 @@ public class Notification {
             CobbleUtils.server.getPlayerManager().getPlayerList().forEach(player -> {
               PlayerUtils.sendMessage(
                       player,
-                      replacePlayers(players, PokemonUtils.replace(notification.getMessageCatch(), pokemons)),
+                      replacePlayers(players, PokemonUtils.replace(notification.getMessageCatch(), pokemons), notification.getMaxDisplayedPlayers()),
                       CobbleNotify.language.getPrefix()
               );
             });
@@ -202,7 +206,7 @@ public class Notification {
             break;
           case SPAWN:
             if (!notification.isSpawned()) return null;
-            message = PokemonUtils.replace(replacePlayers(players, replaceInfo(info, notification.getMessageSpawn())), pokemons);
+            message = PokemonUtils.replace(replacePlayers(players, replaceInfo(info, notification.getMessageSpawn()), notification.getMaxDisplayedPlayers()), pokemons);
             if (notification.isNotifyNearby()) {
               for (ServerPlayerEntity player : players) {
                 PlayerUtils.sendMessage(
@@ -248,25 +252,23 @@ public class Notification {
     return null;
   }
 
-  private static String replacePlayers(List<ServerPlayerEntity> players, String message) {
+  private static String replacePlayers(List<ServerPlayerEntity> players, String message, int maxDisplayedPlayers) {
     if (players == null || players.isEmpty()) {
       message = message.replace("%player%", "");
       for (int i = 0; i < 3; i++) {
-        message = message.replace("%player" + i + "%", "");
+        message = message.replace("%player" + (i + 1) + "%", "");
       }
       return message;
     }
-    int size = players.size();
+    int size = Math.min(players.size(), maxDisplayedPlayers);
     if (size == 1) {
-      message = message
-              .replace("%player%", players.getFirst().getGameProfile().getName());
-    } else {
-      for (int i = 0; i < size; i++) {
-        message = message
-                .replace("%player" + (i + 1) + "%", players.get(i).getGameProfile().getName());
-      }
+      message = message.replace("%player%", players.getFirst().getGameProfile().getName());
+      String joinedNames = players.stream()
+              .limit(maxDisplayedPlayers)
+              .map(p -> p.getGameProfile().getName())
+              .collect(java.util.stream.Collectors.joining(", "));
+      message = message.replace("%player%", joinedNames);
     }
-
     return message;
   }
 

@@ -18,6 +18,7 @@ import com.kingpixel.cobblenotify.utils.UtilsLogger;
 import dev.architectury.event.events.common.CommandRegistrationEvent;
 import dev.architectury.event.events.common.LifecycleEvent;
 import dev.architectury.event.events.common.PlayerEvent;
+import dev.architectury.platform.Platform;
 import net.minecraft.server.MinecraftServer;
 
 /**
@@ -33,9 +34,7 @@ public class CobbleNotify {
   public static Config config = new Config();
   public static WebhookClient webhookClient = null;
 
-  public static void init() {
-    events();
-  }
+  public static void init() {events();}
 
   public static void load() {
     files();
